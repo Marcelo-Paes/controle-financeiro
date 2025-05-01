@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Controle Financeiro</title>
+  <link rel="stylesheet" href="home.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-mode">
+  <div class="container">
+    <h1>💰 Controle Financeiro</h1>
+    <h2>Bem-vindo, <span id="nomeUsuario"></span>!</h2>
+    <button onclick="sair()">Sair</button>
+
+    <div id="app-section">
+      <div class="form-section">
+        <label>Salário:</label>
+        <input type="number" id="salario" placeholder="Ex: 3000" />
+        <button onclick="setSalario()">Salvar Salário</button>
+      </div>
+
+      <div class="form-section">
+        <label>Descrição:</label>
+        <input type="text" id="descricao" placeholder="Ex: Aluguel" /><br>
+        <label>Valor:</label>
+        <input type="number" id="valor" placeholder="Ex: 800" /><br>
+        <label>Tipo:</label>
+        <select id="tipo">
+          <option value="gasto">Gasto</option>
+          <option value="economia">Economia</option>
+        </select>
+        <button onclick="adicionarItem()">Adicionar</button>
+      </div>
+
+      <div class="filtros">
+        <label for="filtroMes">Mês:</label>
+        <select id="filtroMes">
+          <option value="">Todos</option>
+        </select>
+
+        <label for="filtroAno">Ano:</label>
+        <select id="filtroAno">
+          <option value="">Todos</option>
+        </select>
+
+        <button onclick="aplicarFiltros()">Filtrar</button>
+      </div>
+
+      <h2>Resumo</h2>
+      <p>Salário: R$ <span id="viewSalario">0</span></p>
+      <p>Total de Gastos: R$ <span id="totalGastos">0</span></p>
+      <p>Total de Economias: R$ <span id="totalEconomias">0</span></p>
+      <p><strong>Saldo Atual: R$ <span id="saldo">0</span></strong></p>
+      <p><strong>Economias Acumuladas: R$ <span id="saldoEconomias">0</span></strong></p>
+
+      <h2>Lista de Movimentações</h2>
+      <ul id="lista"></ul>
+      <button onclick="reiniciarInformacoes()">Reiniciar Informações</button>
+
+      <h2>Visualização Gráfica</h2>
+      <canvas id="graficoPizza" width="350" height="350"></canvas>
+    </div>
+  </div>
+
+   <!-- Rodapé com direitos autorais -->
+   <footer class="footer">
+    <p>&copy; 2025 Marcelo. Todos os direitos reservados.</p>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBAvc2H2QVHDr7vYmx0-58VOtHMbKA1flM",
+      authDomain: "controle-financeiro-91e08.firebaseapp.com",
+      databaseURL: "https://controle-financeiro-91e08-default-rtdb.firebaseio.com",
+      projectId: "controle-financeiro-91e08",
+      storageBucket: "controle-financeiro-91e08.appspot.com",
+      messagingSenderId: "378316753134",
+      appId: "1:378316753134:web:e27086cbfb60d7c5420bff",
+      measurementId: "G-VW0LL3VP8D"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let userPath = "";
+    let listaMovimentacoes = {};
+    let graficoPizza = null;
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        window.location.href = "index.html";
+        return;
+      }
+
+      userPath = `usuarios/${user.uid}`;
+      document.getElementById("nomeUsuario").textContent = user.displayName;
+
+      const filtroMesSelect = document.getElementById("filtroMes");
+      for (let i = 1; i <= 12; i++) {
+        const opt = document.createElement("option");
+        opt.value = i;
+        opt.textContent = String(i).padStart(2, '0');
+        filtroMesSelect.appendChild(opt);
+      }
+
+      window.setSalario = function () {
+        const valor = parseFloat(document.getElementById("salario").value);
+        if (!isNaN(valor)) {
+          set(ref(db, userPath + "/salario"), valor);
+        }
+      };
+
+      window.adicionarItem = function () {
+        const desc = document.getElementById("descricao").value;
+        const valor = parseFloat(document.getElementById("valor").value);
+        const tipo = document.getElementById("tipo").value;
+
+        if (desc && !isNaN(valor)) {
+          const item = {
+            descricao: desc,
+            valor,
+            tipo,
+            data: new Date().toISOString()
+          };
+          push(ref(db, userPath + "/movimentacoes"), item);
+          document.getElementById("descricao").value = "";
+          document.getElementById("valor").value = "";
+        }
+      };
+
+      window.editarMovimentacao = function (id) {
+        const mov = listaMovimentacoes[id];
+        document.getElementById("descricao").value = mov.descricao;
+        document.getElementById("valor").value = mov.valor;
+        document.getElementById("tipo").value = mov.tipo;
+        remove(ref(db, `${userPath}/movimentacoes/${id}`));
+      };
+
+      window.excluirMovimentacao = function (id) {
+        remove(ref(db, `${userPath}/movimentacoes/${id}`));
+      };
+
+      window.reiniciarInformacoes = function () {
+        const confirmReiniciar = confirm("Você tem certeza que deseja reiniciar todas as informações?");
+        if (confirmReiniciar) {
+          set(ref(db, `${userPath}/movimentacoes`), null);
+        }
+      };
+
+      window.sair = function () {
+        signOut(auth).then(() => {
+          window.location.href = "index.html";
+        }).catch((error) => {
+          alert("Erro ao sair. Tente novamente.");
+        });
+      };
+
+      window.aplicarFiltros = function () {
+        carregarDados();
+      };
+
+      carregarDados();
+    });
+
+    function carregarDados() {
+      onValue(ref(db, userPath + "/salario"), (snapshot) => {
+        const salario = snapshot.val() || 0;
+        document.getElementById("viewSalario").textContent = salario.toFixed(2);
+        atualizarSaldo();
+      });
+
+      onValue(ref(db, userPath + "/movimentacoes"), (snapshot) => {
+        listaMovimentacoes = snapshot.val() || {};
+        const lista = document.getElementById("lista");
+        lista.innerHTML = "";
+        let gastos = 0, economias = 0;
+
+        const filtroMes = parseInt(document.getElementById("filtroMes")?.value);
+        const filtroAno = parseInt(document.getElementById("filtroAno")?.value);
+
+        const anosUnicos = new Set();
+
+        for (const id in listaMovimentacoes) {
+          const mov = listaMovimentacoes[id];
+
+          if (mov.data) {
+            const data = new Date(mov.data);
+            const mes = data.getMonth() + 1;
+            const ano = data.getFullYear();
+
+            anosUnicos.add(ano);
+
+            if ((filtroMes && mes !== filtroMes) || (filtroAno && ano !== filtroAno)) {
+              continue;
+            }
+          }
+
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <span class="descricao">${mov.descricao} - R$ ${mov.valor.toFixed(2)} (${mov.tipo})</span>
+            <div class="botoes">
+              <button onclick="editarMovimentacao('${id}')">✏️</button>
+              <button class="delete" onclick="excluirMovimentacao('${id}')">❌</button>
+            </div>
+          `;
+          lista.appendChild(li);
+
+          if (mov.tipo === "gasto") gastos += mov.valor;
+          else if (mov.tipo === "economia") economias += mov.valor;
+        }
+
+        const selectAno = document.getElementById("filtroAno");
+        if (selectAno.options.length <= 1) {
+          anosUnicos.forEach(ano => {
+            const option = document.createElement("option");
+            option.value = ano;
+            option.textContent = ano;
+            selectAno.appendChild(option);
+          });
+        }
+
+        document.getElementById("totalGastos").textContent = gastos.toFixed(2);
+        document.getElementById("totalEconomias").textContent = economias.toFixed(2);
+        atualizarSaldo();
+        atualizarGraficoPizza(gastos, economias, parseFloat(document.getElementById("viewSalario").textContent) - gastos);
+      });
+    }
+
+    function atualizarSaldo() {
+      const salario = parseFloat(document.getElementById("viewSalario").textContent);
+      const gastos = parseFloat(document.getElementById("totalGastos").textContent);
+      const economias = parseFloat(document.getElementById("totalEconomias").textContent);
+
+      const saldoAtual = salario - gastos;
+      document.getElementById("saldo").textContent = saldoAtual.toFixed(2);
+      document.getElementById("saldoEconomias").textContent = economias.toFixed(2);
+    }
+
+    function atualizarGraficoPizza(gastos, economias, saldoDisponivel) {
+      const ctx = document.getElementById('graficoPizza').getContext('2d');
+      const dados = {
+        labels: ['Gastos', 'Economias', 'Saldo Disponível'],
+        datasets: [{
+          data: [gastos, economias, saldoDisponivel],
+          backgroundColor: ['#e53935', '#43a047', '#1e88e5'],
+        }]
+      };
+
+      if (graficoPizza) {
+        graficoPizza.data = dados;
+        graficoPizza.update();
+      } else {
+        graficoPizza = new Chart(ctx, {
+          type: 'pie',
+          data: dados,
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                labels: {
+                  color: '#fff',
+                  font: { family: 'Inter' }
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>

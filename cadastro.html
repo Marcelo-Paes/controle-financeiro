@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastro - Controle Financeiro</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h2>Cadastro</h2>
+    <input type="text" id="nomeCadastro" placeholder="Nome Completo" />
+    <input type="email" id="emailCadastro" placeholder="Email" />
+    <input type="password" id="senhaCadastro" placeholder="Senha" />
+    <button onclick="cadastrar()">Cadastrar</button>
+    <p><a href="index.html">Login</a></p>
+  </div>
+ <!-- Rodapé com direitos autorais -->
+ <footer class="footer">
+  <p>&copy; 2025 Marcelo. Todos os direitos reservados.</p>
+</footer>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBAvc2H2QVHDr7vYmx0-58VOtHMbKA1flM",
+      authDomain: "controle-financeiro-91e08.firebaseapp.com",
+      projectId: "controle-financeiro-91e08",
+      storageBucket: "controle-financeiro-91e08.appspot.com",
+      messagingSenderId: "378316753134",
+      appId: "1:378316753134:web:e27086cbfb60d7c5420bff",
+      measurementId: "G-VW0LL3VP8D"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    window.cadastrar = function () {
+      const nome = document.getElementById("nomeCadastro").value;
+      const email = document.getElementById("emailCadastro").value;
+      const senha = document.getElementById("senhaCadastro").value;
+
+      if (!nome || !email || !senha) {
+        alert("Por favor, preencha todos os campos.");
+        return;
+      }
+
+      createUserWithEmailAndPassword(auth, email, senha)
+        .then((userCredential) => {
+          const user = userCredential.user;
+          updateProfile(user, { displayName: nome })
+            .then(() => {
+              console.log("Usuário cadastrado com sucesso!");
+              alert("Cadastro realizado com sucesso!");
+              window.location.href = "index.html";  // Redireciona para a página de login após o cadastro
+            });
+        })
+        .catch((error) => {
+          console.error(`Erro no cadastro: ${error.code}, ${error.message}`);
+          alert("Erro ao cadastrar. Tente novamente.");
+        });
+    };
+  </script>
+</body>
+</html>
